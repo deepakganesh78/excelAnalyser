@@ -56,8 +56,7 @@ class DataVisualizer:
                 cells=dict(values=[
                     [str(idx) for idx in stats.index],
                     [f"{float(val):.2f}" for val in stats.values]
-                ]),
-                showlegend=False
+                ])
             ),
             row=2, col=2
         )
