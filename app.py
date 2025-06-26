@@ -8,10 +8,11 @@ import io
 from utils.data_analyzer import DataAnalyzer
 from utils.kpi_generator import KPIGenerator
 from utils.visualizations import DataVisualizer
+from utils.ppt_analyzer import PowerPointAnalyzer
 
 # Page configuration
 st.set_page_config(
-    page_title="Excel Data Insights & KPI Analyzer",
+    page_title="Data Insights & Analysis Platform",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -20,48 +21,85 @@ st.set_page_config(
 # Initialize session state
 if 'data' not in st.session_state:
     st.session_state.data = None
+if 'ppt_analyzer' not in st.session_state:
+    st.session_state.ppt_analyzer = None
 if 'analysis_complete' not in st.session_state:
     st.session_state.analysis_complete = False
+if 'file_type' not in st.session_state:
+    st.session_state.file_type = None
 
 def main():
-    st.title("📊 Excel Data Insights & KPI Analyzer")
-    st.markdown("Upload your Excel file to get automated insights, data analysis, and KPI recommendations.")
+    st.title("📊 Data Insights & Analysis Platform")
+    st.markdown("Upload Excel files for data analysis or PowerPoint presentations for content insights.")
     
     # Sidebar for file upload and navigation
     with st.sidebar:
         st.header("📁 File Upload")
-        uploaded_file = st.file_uploader(
-            "Choose an Excel file",
-            type=['xlsx', 'xls'],
-            help="Upload Excel files (.xlsx or .xls format)"
+        
+        # File type selection
+        file_type = st.radio(
+            "Select file type:",
+            ["Excel Files", "PowerPoint Presentations"],
+            help="Choose the type of file you want to analyze"
         )
+        
+        if file_type == "Excel Files":
+            uploaded_file = st.file_uploader(
+                "Choose an Excel file",
+                type=['xlsx', 'xls'],
+                help="Upload Excel files (.xlsx or .xls format)"
+            )
+        else:
+            uploaded_file = st.file_uploader(
+                "Choose a PowerPoint file",
+                type=['pptx', 'ppt'],
+                help="Upload PowerPoint files (.pptx or .ppt format)"
+            )
         
         if uploaded_file is not None:
             try:
-                # Read Excel file and handle multiple sheets
-                excel_file = pd.ExcelFile(uploaded_file)
-                sheet_names = excel_file.sheet_names
-                
-                if len(sheet_names) > 1:
-                    selected_sheet = st.selectbox(
-                        "Select Sheet",
-                        sheet_names,
-                        help="Choose which sheet to analyze"
-                    )
+                if file_type == "Excel Files":
+                    # Read Excel file and handle multiple sheets
+                    excel_file = pd.ExcelFile(uploaded_file)
+                    sheet_names = excel_file.sheet_names
+                    
+                    if len(sheet_names) > 1:
+                        selected_sheet = st.selectbox(
+                            "Select Sheet",
+                            sheet_names,
+                            help="Choose which sheet to analyze"
+                        )
+                    else:
+                        selected_sheet = sheet_names[0]
+                    
+                    # Load data
+                    data = pd.read_excel(uploaded_file, sheet_name=selected_sheet)
+                    st.session_state.data = data
+                    st.session_state.ppt_analyzer = None
+                    st.session_state.file_type = "excel"
+                    st.session_state.analysis_complete = True
+                    
+                    st.success(f"✅ Successfully loaded sheet: {selected_sheet}")
+                    st.info(f"📊 Data shape: {data.shape[0]} rows × {data.shape[1]} columns")
+                    
                 else:
-                    selected_sheet = sheet_names[0]
-                
-                # Load data
-                data = pd.read_excel(uploaded_file, sheet_name=selected_sheet)
-                st.session_state.data = data
-                st.session_state.analysis_complete = True
-                
-                st.success(f"✅ Successfully loaded sheet: {selected_sheet}")
-                st.info(f"📊 Data shape: {data.shape[0]} rows × {data.shape[1]} columns")
-                
+                    # Process PowerPoint file
+                    file_content = io.BytesIO(uploaded_file.read())
+                    ppt_analyzer = PowerPointAnalyzer(file_content)
+                    
+                    st.session_state.ppt_analyzer = ppt_analyzer
+                    st.session_state.data = None
+                    st.session_state.file_type = "powerpoint"
+                    st.session_state.analysis_complete = True
+                    
+                    overview = ppt_analyzer.get_presentation_overview()
+                    st.success(f"✅ Successfully loaded PowerPoint presentation")
+                    st.info(f"📊 Presentation: {overview['total_slides']} slides, {overview['total_text_length']} characters")
+                    
             except Exception as e:
-                st.error(f"❌ Error reading Excel file: {str(e)}")
+                st.error(f"❌ Error reading file: {str(e)}")
                 st.session_state.data = None
+                st.session_state.ppt_analyzer = None
                 st.session_state.analysis_complete = False
     
     # Main content area
