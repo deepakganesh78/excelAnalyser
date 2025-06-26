@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is a Streamlit-based web application that provides automated data analysis and KPI generation for Excel files. The application allows users to upload Excel files and receive comprehensive insights including statistical analysis, data quality metrics, and business KPI recommendations. Built with Python, it leverages data science libraries like pandas, numpy, scipy, and plotly for robust data processing and visualization.
+This is a production-ready Streamlit-based web application that provides automated data analysis and KPI generation for Excel files. Users can upload Excel files and receive comprehensive insights including statistical analysis, data quality metrics, and focused business KPI recommendations. The application filters out invalid metrics (NaN/infinite values) and prioritizes critical KPIs for better user experience. Built with Python, it leverages data science libraries like pandas, numpy, scipy, and plotly for robust data processing and interactive visualization.
 
 ## System Architecture
 
@@ -102,8 +102,12 @@ The application follows a modular architecture with clear separation of concerns
 
 ## Changelog
 
-- June 25, 2025. Initial setup
+- June 26, 2025: Fixed Plotly visualization serialization errors and enhanced KPI filtering
+- June 25, 2025: Initial setup
 
 ## User Preferences
 
-Preferred communication style: Simple, everyday language.
+- Preferred communication style: Simple, everyday language
+- KPI Display: Only show critical KPIs (Business, Data Quality, Performance categories)
+- Data Quality: Filter out NaN and infinite values from metrics display
+- KPI Focus: Limit to top 3 KPIs per category for better user experience

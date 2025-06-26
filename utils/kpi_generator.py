@@ -51,7 +51,7 @@ class KPIGenerator:
                 'description': f'Coefficient of variation for {col} to measure relative variability',
                 'formula': f'STDEV({col}) / MEAN({col}) * 100',
                 'business_value': 'Helps identify consistency and predictability in data',
-                'calculation': lambda data, column=col: (data[column].std() / data[column].mean()) * 100 if data[column].mean() != 0 else 0
+                'calculation': lambda data, column=col: (data[column].std() / data[column].mean()) * 100 if data[column].mean() != 0 and not pd.isna(data[column].mean()) else None
             })
             
             # Growth/Change KPIs if multiple records exist
@@ -61,7 +61,7 @@ class KPIGenerator:
                     'description': f'Ratio of maximum to minimum values in {col}',
                     'formula': f'MAX({col}) / MIN({col})',
                     'business_value': 'Indicates the spread and potential outliers in the data',
-                    'calculation': lambda data, column=col: data[column].max() / data[column].min() if data[column].min() != 0 else float('inf')
+                    'calculation': lambda data, column=col: data[column].max() / data[column].min() if data[column].min() != 0 and not pd.isna(data[column].min()) else None
                 })
         
         return kpis
@@ -130,9 +130,9 @@ class KPIGenerator:
                 'formula': 'AVERAGE(STDEV(column) / MEAN(column)) for all numerical columns',
                 'business_value': 'Measures overall data consistency and reliability',
                 'calculation': lambda data: np.mean([
-                    (data[col].std() / data[col].mean()) if data[col].mean() != 0 else 0 
+                    (data[col].std() / data[col].mean()) if data[col].mean() != 0 and not pd.isna(data[col].mean()) else 0 
                     for col in data.select_dtypes(include=[np.number]).columns
-                ])
+                ]) if len(data.select_dtypes(include=[np.number]).columns) > 0 else None
             })
         
         return kpis
@@ -148,7 +148,7 @@ class KPIGenerator:
                 'description': f'Total time period covered by {col}',
                 'formula': f'MAX({col}) - MIN({col})',
                 'business_value': 'Indicates the temporal coverage of the dataset',
-                'calculation': lambda data, column=col: (data[column].max() - data[column].min()).days
+                'calculation': lambda data, column=col: (data[column].max() - data[column].min()).days if not pd.isna(data[column].max()) and not pd.isna(data[column].min()) else None
             })
             
             # Data frequency KPI
@@ -157,7 +157,7 @@ class KPIGenerator:
                 'description': f'Average number of records per day in {col}',
                 'formula': f'COUNT(records) / DAYS_BETWEEN(MAX({col}), MIN({col}))',
                 'business_value': 'Measures data collection frequency and consistency',
-                'calculation': lambda data, column=col: len(data) / max(1, (data[column].max() - data[column].min()).days)
+                'calculation': lambda data, column=col: len(data) / max(1, (data[column].max() - data[column].min()).days) if not pd.isna(data[column].max()) and not pd.isna(data[column].min()) else None
             })
         
         # If numerical data exists with time data
@@ -240,11 +240,12 @@ class KPIGenerator:
             sorted_data = data.sort_values(date_column)
             first_value = sorted_data[num_column].iloc[0]
             last_value = sorted_data[num_column].iloc[-1]
-            if first_value != 0:
-                return ((last_value - first_value) / first_value) * 100
-            return 0
+            if first_value != 0 and not pd.isna(first_value) and not pd.isna(last_value):
+                growth_rate = ((last_value - first_value) / first_value) * 100
+                return growth_rate if not (np.isnan(growth_rate) or np.isinf(growth_rate)) else None
+            return None
         except:
-            return 0
+            return None
     
     def _calculate_success_rate(self, data, column):
         """Calculate success rate based on status column values."""

@@ -130,7 +130,9 @@ def main():
                 
                 for metric, value in quality_metrics.items():
                     if isinstance(value, (int, float)):
-                        st.metric(metric, f"{value:.2f}" if isinstance(value, float) else value)
+                        # Skip NaN and infinite values
+                        if not (np.isnan(value) or np.isinf(value)):
+                            st.metric(metric, f"{value:.2f}" if isinstance(value, float) else value)
                     else:
                         st.write(f"**{metric}:** {value}")
             
@@ -166,21 +168,33 @@ def main():
             kpi_suggestions = kpi_generator.generate_kpi_suggestions()
             
             if kpi_suggestions:
-                for category, kpis in kpi_suggestions.items():
-                    st.subheader(f"{category}")
-                    for kpi in kpis:
-                        with st.expander(f"🎯 {kpi['name']}"):
-                            st.write(f"**Description:** {kpi['description']}")
-                            st.write(f"**Formula:** {kpi['formula']}")
-                            st.write(f"**Business Value:** {kpi['business_value']}")
+                # Filter and show only critical KPIs
+                critical_categories = ['Business KPIs', 'Data Quality KPIs', 'Performance KPIs']
+                
+                for category in critical_categories:
+                    if category in kpi_suggestions:
+                        kpis = kpi_suggestions[category]
+                        if kpis:  # Only show if there are KPIs in this category
+                            st.subheader(f"{category}")
                             
-                            # Calculate KPI if possible
-                            if kpi.get('calculation'):
-                                try:
-                                    result = kpi['calculation'](data)
-                                    st.metric("Calculated Value", f"{result:.2f}" if isinstance(result, (int, float)) else result)
-                                except Exception as e:
-                                    st.warning(f"Could not calculate: {str(e)}")
+                            # Limit to top 3 KPIs per category for focus
+                            for kpi in kpis[:3]:
+                                with st.expander(f"🎯 {kpi['name']}"):
+                                    st.write(f"**Description:** {kpi['description']}")
+                                    st.write(f"**Formula:** {kpi['formula']}")
+                                    st.write(f"**Business Value:** {kpi['business_value']}")
+                                    
+                                    # Calculate KPI if possible
+                                    if kpi.get('calculation'):
+                                        try:
+                                            result = kpi['calculation'](data)
+                                            # Only show valid results (not NaN or infinite)
+                                            if isinstance(result, (int, float)) and not (np.isnan(result) or np.isinf(result)):
+                                                st.metric("Calculated Value", f"{result:.2f}")
+                                            elif not isinstance(result, (int, float)):
+                                                st.metric("Calculated Value", str(result))
+                                        except Exception as e:
+                                            st.warning(f"Could not calculate: {str(e)}")
             else:
                 st.info("Upload data to see KPI recommendations.")
         
