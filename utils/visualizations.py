@@ -23,7 +23,8 @@ class DataVisualizer:
         )
         
         # Clean data and convert to numeric
-        clean_data = pd.to_numeric(self.data[column], errors='coerce').dropna()
+        clean_series = pd.to_numeric(self.data[column], errors='coerce')
+        clean_data = clean_series.dropna()
         
         # Histogram
         fig.add_trace(
@@ -71,11 +72,23 @@ class DataVisualizer:
     
     def create_categorical_plot(self, column):
         """Create visualization for categorical column."""
-        value_counts = self.data[column].value_counts()
+        # Clean data and get value counts
+        clean_data = self.data[column].dropna()
+        
+        if len(clean_data) == 0:
+            fig = go.Figure()
+            fig.update_layout(title=f"No valid data in {column}")
+            return fig
+        
+        value_counts = clean_data.value_counts()
+        
+        # Limit to top 20 categories to avoid cluttered visualization
+        if len(value_counts) > 20:
+            value_counts = value_counts.head(20)
         
         fig = make_subplots(
             rows=1, cols=2,
-            subplot_titles=(f'{column} - Bar Chart', f'{column} - Pie Chart'),
+            subplot_titles=(f'{column} - Bar Chart (Top {len(value_counts)})', f'{column} - Pie Chart'),
             specs=[[{"type": "bar"}, {"type": "pie"}]]
         )
         
@@ -119,15 +132,25 @@ class DataVisualizer:
         
         fig = go.Figure()
         
-        # Convert to proper types
+        # Convert to proper types and align data
         x_data = pd.to_datetime(sorted_data[date_column])
-        y_data = pd.to_numeric(sorted_data[value_column], errors='coerce').dropna()
+        y_data = pd.to_numeric(sorted_data[value_column], errors='coerce')
+        
+        # Create aligned dataset without NaN values
+        plot_data = pd.DataFrame({
+            'date': x_data,
+            'value': y_data
+        }).dropna()
+        
+        if len(plot_data) == 0:
+            fig.update_layout(title=f"No valid data for {value_column} over {date_column}")
+            return fig
         
         # Line plot
         fig.add_trace(
             go.Scatter(
-                x=x_data,
-                y=y_data,
+                x=plot_data['date'],
+                y=plot_data['value'],
                 mode='lines+markers',
                 name=f'{value_column} over time',
                 line=dict(width=2),
@@ -136,18 +159,18 @@ class DataVisualizer:
         )
         
         # Add trend line if enough data points
-        if len(sorted_data) > 2:
+        if len(plot_data) > 2:
             try:
                 z = np.polyfit(
-                    pd.to_numeric(x_data), 
-                    y_data, 
+                    pd.to_numeric(plot_data['date']), 
+                    plot_data['value'], 
                     1
                 )
                 p = np.poly1d(z)
                 fig.add_trace(
                     go.Scatter(
-                        x=x_data,
-                        y=p(pd.to_numeric(x_data)),
+                        x=plot_data['date'],
+                        y=p(pd.to_numeric(plot_data['date'])),
                         mode='lines',
                         name='Trend',
                         line=dict(dash='dash', color='red')
@@ -247,7 +270,8 @@ class DataVisualizer:
         for col in columns:
             if col in self.data.select_dtypes(include=[np.number]).columns:
                 # Clean and normalize data for comparison
-                clean_col_data = pd.to_numeric(self.data[col], errors='coerce').dropna()
+                clean_col_series = pd.to_numeric(self.data[col], errors='coerce')
+                clean_col_data = clean_col_series.dropna()
                 if len(clean_col_data) > 0 and clean_col_data.max() != clean_col_data.min():
                     normalized_data = (clean_col_data - clean_col_data.min()) / (clean_col_data.max() - clean_col_data.min())
                     
@@ -271,7 +295,8 @@ class DataVisualizer:
     def create_outlier_visualization(self, column):
         """Create visualization highlighting outliers."""
         # Clean and convert data
-        clean_data = pd.to_numeric(self.data[column], errors='coerce').dropna()
+        clean_series = pd.to_numeric(self.data[column], errors='coerce')
+        clean_data = clean_series.dropna()
         
         if len(clean_data) == 0:
             # Return empty figure if no valid data

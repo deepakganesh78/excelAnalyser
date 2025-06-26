@@ -203,51 +203,96 @@ def main():
             
             # Numerical columns distribution
             numerical_cols = data.select_dtypes(include=[np.number]).columns.tolist()
-            if numerical_cols:
+            # Filter columns that have valid data
+            valid_numerical_cols = []
+            for col in numerical_cols:
+                clean_series = pd.to_numeric(data[col], errors='coerce')
+                clean_data = clean_series.dropna()
+                if len(clean_data) > 0:
+                    valid_numerical_cols.append(col)
+            
+            if valid_numerical_cols:
                 st.subheader("Numerical Data Distributions")
-                selected_num_col = st.selectbox("Select numerical column", numerical_cols)
+                selected_num_col = st.selectbox("Select numerical column", valid_numerical_cols)
                 if selected_num_col:
                     fig = visualizer.create_distribution_plot(selected_num_col)
                     st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("No valid numerical data available for distribution plots.")
             
             # Categorical columns
             categorical_cols = data.select_dtypes(include=['object']).columns.tolist()
-            if categorical_cols:
+            # Filter columns that have valid data and reasonable unique values
+            valid_categorical_cols = []
+            for col in categorical_cols:
+                clean_data = data[col].dropna()
+                if len(clean_data) > 0 and clean_data.nunique() > 1 and clean_data.nunique() <= 50:
+                    valid_categorical_cols.append(col)
+            
+            if valid_categorical_cols:
                 st.subheader("Categorical Data Analysis")
-                selected_cat_col = st.selectbox("Select categorical column", categorical_cols)
+                selected_cat_col = st.selectbox("Select categorical column", valid_categorical_cols)
                 if selected_cat_col:
                     fig = visualizer.create_categorical_plot(selected_cat_col)
                     st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("No suitable categorical data available for visualization.")
             
             # Time series analysis if datetime columns exist
             datetime_cols = data.select_dtypes(include=['datetime64']).columns.tolist()
-            if datetime_cols:
+            # Filter datetime columns that have valid data
+            valid_datetime_cols = []
+            for col in datetime_cols:
+                clean_series = pd.to_datetime(data[col], errors='coerce')
+                clean_data = clean_series.dropna()
+                if len(clean_data) > 1 and clean_data.nunique() > 1:
+                    valid_datetime_cols.append(col)
+            
+            if valid_datetime_cols and valid_numerical_cols:
                 st.subheader("Time Series Analysis")
-                selected_date_col = st.selectbox("Select datetime column", datetime_cols)
-                if selected_date_col and numerical_cols:
-                    selected_value_col = st.selectbox("Select value column", numerical_cols)
-                    fig = visualizer.create_time_series_plot(selected_date_col, selected_value_col)
-                    st.plotly_chart(fig, use_container_width=True)
+                selected_date_col = st.selectbox("Select datetime column", valid_datetime_cols)
+                if selected_date_col:
+                    selected_value_col = st.selectbox("Select value column", valid_numerical_cols)
+                    if selected_value_col:
+                        fig = visualizer.create_time_series_plot(selected_date_col, selected_value_col)
+                        st.plotly_chart(fig, use_container_width=True)
+            elif valid_datetime_cols and not valid_numerical_cols:
+                st.info("Time series analysis requires valid numerical data.")
+            elif not valid_datetime_cols and valid_numerical_cols:
+                st.info("Time series analysis requires valid datetime data.")
+            else:
+                st.info("Time series analysis requires both valid datetime and numerical data.")
         
         with tab5:
             st.header("Correlation Analysis")
             
-            if len(numerical_cols) > 1:
-                correlation_matrix = analyzer.calculate_correlation_matrix()
+            if len(valid_numerical_cols) > 1:
+                # Filter data to only include valid numerical columns
+                valid_data = data[valid_numerical_cols].copy()
+                for col in valid_numerical_cols:
+                    valid_data[col] = pd.to_numeric(valid_data[col], errors='coerce')
+                valid_data = valid_data.dropna()
                 
-                # Correlation heatmap
-                fig = visualizer.create_correlation_heatmap(correlation_matrix)
-                st.plotly_chart(fig, use_container_width=True)
-                
-                # Strong correlations
-                st.subheader("Strong Correlations")
-                strong_corr = analyzer.find_strong_correlations()
-                if not strong_corr.empty:
-                    st.dataframe(strong_corr, use_container_width=True)
+                if len(valid_data) > 1 and valid_data.shape[1] > 1:
+                    correlation_matrix = valid_data.corr()
+                    
+                    # Correlation heatmap
+                    fig = visualizer.create_correlation_heatmap(correlation_matrix)
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Strong correlations
+                    st.subheader("Strong Correlations")
+                    # Create temporary analyzer for filtered data
+                    temp_analyzer = DataAnalyzer(valid_data)
+                    strong_corr = temp_analyzer.find_strong_correlations()
+                    if not strong_corr.empty:
+                        st.dataframe(strong_corr, use_container_width=True)
+                    else:
+                        st.info("No strong correlations found (threshold: 0.7)")
                 else:
-                    st.info("No strong correlations found (threshold: 0.7)")
+                    st.info("Insufficient valid data for correlation analysis.")
             else:
-                st.info("Need at least 2 numerical columns for correlation analysis.")
+                st.info("Need at least 2 valid numerical columns for correlation analysis.")
         
         with tab6:
             st.header("Export Analysis Report")
