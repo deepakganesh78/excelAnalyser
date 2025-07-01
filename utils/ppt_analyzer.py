@@ -35,8 +35,12 @@ class PowerPointAnalyzer:
             
             # Extract text from all shapes
             for shape in slide.shapes:
-                if hasattr(shape, "text") and hasattr(shape, "text_frame"):
-                    text = shape.text.strip() if shape.text else ""
+                try:
+                    # Check if shape has text attribute and text_frame
+                    if not hasattr(shape, "text"):
+                        continue
+                    
+                    text = str(getattr(shape, "text", "")).strip()
                     if not text:
                         continue
                     
@@ -50,6 +54,10 @@ class PowerPointAnalyzer:
                     if text.startswith(('•', '-', '*')) or '\n•' in text or '\n-' in text:
                         bullet_points = [line.strip() for line in text.split('\n') if line.strip()]
                         slide_data['bullet_points'].extend(bullet_points)
+                        
+                except (AttributeError, Exception):
+                    # Skip shapes that don't have text or cause errors
+                    continue
             
             # Calculate total text length
             all_text = slide_data['title'] + ' ' + ' '.join(slide_data['content'])
