@@ -103,7 +103,123 @@ def main():
                 st.session_state.analysis_complete = False
     
     # Main content area
-    if st.session_state.data is not None and st.session_state.analysis_complete:
+    if st.session_state.ppt_analyzer is not None and st.session_state.analysis_complete:
+        # PowerPoint Analysis Interface
+        ppt_analyzer = st.session_state.ppt_analyzer
+        
+        # Create tabs for PowerPoint analysis
+        tab1, tab2, tab3, tab4 = st.tabs([
+            "📊 Presentation Overview",
+            "📋 Content Analysis", 
+            "🎯 Presentation KPIs",
+            "🤖 AI Insights"
+        ])
+        
+        with tab1:
+            st.header("Presentation Overview")
+            
+            overview = ppt_analyzer.get_presentation_overview()
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Slides", overview['total_slides'])
+                st.metric("Slides with Titles", overview['slides_with_titles'])
+            with col2:
+                st.metric("Total Text Length", f"{overview['total_text_length']:,} chars")
+                st.metric("Average Text per Slide", f"{overview['average_text_per_slide']:.1f} chars")
+            with col3:
+                st.metric("Slides with Content", overview['slides_with_content'])
+                st.metric("Total Bullet Points", overview['total_bullet_points'])
+        
+        with tab2:
+            st.header("Content Structure Analysis")
+            
+            structure = ppt_analyzer.analyze_content_structure()
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.subheader("Text Distribution")
+                dist = structure['text_distribution']
+                st.write(f"**Minimum text length:** {dist['min_text_length']} characters")
+                st.write(f"**Maximum text length:** {dist['max_text_length']} characters")
+                st.write(f"**Average text length:** {dist['avg_text_length']:.1f} characters")
+            
+            with col2:
+                st.subheader("Content Consistency")
+                consistency = structure['content_consistency']
+                st.write(f"**Title consistency:** {consistency['title_consistency']*100:.1f}%")
+                st.write(f"**Content consistency score:** {consistency['content_consistency_score']*100:.1f}%")
+                st.write(f"**Has consistent structure:** {'✅ Yes' if consistency['consistent_structure'] else '❌ No'}")
+            
+            st.subheader("Slide Categories")
+            slide_types = structure['slide_types']
+            for category, count in slide_types.items():
+                st.write(f"**{category.replace('_', ' ').title()}:** {count}")
+            
+            # Display slide content
+            st.subheader("Slide Content Details")
+            slides_data = ppt_analyzer.extract_slide_content()
+            for slide in slides_data:
+                with st.expander(f"Slide {slide['slide_number']}: {slide['title'] or 'No Title'}"):
+                    if slide['title']:
+                        st.write(f"**Title:** {slide['title']}")
+                    if slide['content']:
+                        st.write("**Content:**")
+                        for content in slide['content']:
+                            st.write(f"- {content}")
+                    if slide['bullet_points']:
+                        st.write("**Bullet Points:**")
+                        for bullet in slide['bullet_points']:
+                            st.write(f"• {bullet}")
+                    st.write(f"**Text Length:** {slide['text_length']} characters")
+                    st.write(f"**Shape Count:** {slide['shape_count']}")
+        
+        with tab3:
+            st.header("Presentation KPIs")
+            
+            kpis = ppt_analyzer.generate_presentation_kpis()
+            
+            for kpi in kpis:
+                with st.expander(f"📊 {kpi['name']}"):
+                    col1, col2 = st.columns([1, 2])
+                    with col1:
+                        st.metric(kpi['name'], f"{kpi['value']} {kpi['unit']}")
+                    with col2:
+                        st.write(f"**Category:** {kpi['category']}")
+                        st.write(f"**Description:** {kpi['description']}")
+                        st.write(f"**Recommendation:** {kpi['recommendation']}")
+        
+        with tab4:
+            st.header("AI-Powered Insights")
+            
+            if st.button("🤖 Generate AI Analysis"):
+                with st.spinner("Analyzing presentation content..."):
+                    insights = ppt_analyzer.generate_ai_insights()
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.subheader("Summary")
+                    st.write(insights['summary'])
+                    
+                    st.subheader("Key Themes")
+                    if isinstance(insights['key_themes'], list):
+                        for theme in insights['key_themes']:
+                            st.write(f"• {theme}")
+                    else:
+                        st.write(insights['key_themes'])
+                
+                with col2:
+                    st.subheader("Content Quality")
+                    st.write(insights['content_quality'])
+                    
+                    st.subheader("Recommendations")
+                    if isinstance(insights['recommendations'], list):
+                        for rec in insights['recommendations']:
+                            st.write(f"• {rec}")
+                    else:
+                        st.write(insights['recommendations'])
+    
+    elif st.session_state.data is not None and st.session_state.analysis_complete:
         data = st.session_state.data
         
         # Initialize analyzers
@@ -239,191 +355,74 @@ def main():
         with tab4:
             st.header("Data Visualizations")
             
-            # Numerical columns distribution
-            numerical_cols = data.select_dtypes(include=[np.number]).columns.tolist()
-            # Filter columns that have valid data
-            valid_numerical_cols = []
-            for col in numerical_cols:
-                clean_series = pd.to_numeric(data[col], errors='coerce')
-                clean_data = clean_series.dropna()
-                if len(clean_data) > 0:
-                    valid_numerical_cols.append(col)
+            # Create sub-tabs for different visualization types
+            viz_tab1, viz_tab2 = st.tabs(["📊 Standard Charts", "🎯 Custom Metrics"])
             
-            if valid_numerical_cols:
-                st.subheader("Numerical Data Distributions")
-                selected_num_col = st.selectbox("Select numerical column", valid_numerical_cols)
-                if selected_num_col:
-                    fig = visualizer.create_distribution_plot(selected_num_col)
-                    st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info("No valid numerical data available for distribution plots.")
-            
-            # Categorical columns
-            categorical_cols = data.select_dtypes(include=['object']).columns.tolist()
-            # Filter columns that have valid data and reasonable unique values
-            valid_categorical_cols = []
-            for col in categorical_cols:
-                clean_data = data[col].dropna()
-                if len(clean_data) > 0 and clean_data.nunique() > 1 and clean_data.nunique() <= 50:
-                    valid_categorical_cols.append(col)
-            
-            if valid_categorical_cols:
-                st.subheader("Categorical Data Analysis")
-                selected_cat_col = st.selectbox("Select categorical column", valid_categorical_cols)
-                if selected_cat_col:
-                    fig = visualizer.create_categorical_plot(selected_cat_col)
-                    st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info("No suitable categorical data available for visualization.")
-            
-            # Time series analysis if datetime columns exist
-            datetime_cols = data.select_dtypes(include=['datetime64']).columns.tolist()
-            # Filter datetime columns that have valid data
-            valid_datetime_cols = []
-            for col in datetime_cols:
-                clean_series = pd.to_datetime(data[col], errors='coerce')
-                clean_data = clean_series.dropna()
-                if len(clean_data) > 1 and clean_data.nunique() > 1:
-                    valid_datetime_cols.append(col)
-            
-            if valid_datetime_cols and valid_numerical_cols:
-                st.subheader("Time Series Analysis")
-                selected_date_col = st.selectbox("Select datetime column", valid_datetime_cols)
-                if selected_date_col:
-                    selected_value_col = st.selectbox("Select value column", valid_numerical_cols)
-                    if selected_value_col:
-                        fig = visualizer.create_time_series_plot(selected_date_col, selected_value_col)
+            with viz_tab1:
+                # Numerical columns distribution
+                numerical_cols = data.select_dtypes(include=[np.number]).columns.tolist()
+                # Filter columns that have valid data
+                valid_numerical_cols = []
+                for col in numerical_cols:
+                    clean_series = pd.to_numeric(data[col], errors='coerce')
+                    clean_data = clean_series.dropna()
+                    if len(clean_data) > 0:
+                        valid_numerical_cols.append(col)
+                
+                if valid_numerical_cols:
+                    st.subheader("Numerical Data Distributions")
+                    selected_num_col = st.selectbox("Select numerical column", valid_numerical_cols)
+                    if selected_num_col:
+                        fig = visualizer.create_distribution_plot(selected_num_col)
                         st.plotly_chart(fig, use_container_width=True)
-            elif valid_datetime_cols and not valid_numerical_cols:
-                st.info("Time series analysis requires valid numerical data.")
-            elif not valid_datetime_cols and valid_numerical_cols:
-                st.info("Time series analysis requires valid datetime data.")
-            else:
-                st.info("Time series analysis requires both valid datetime and numerical data.")
-        
-        with tab5:
-            st.header("Correlation Analysis")
-            
-            if len(valid_numerical_cols) > 1:
-                # Filter data to only include valid numerical columns
-                valid_data = data[valid_numerical_cols].copy()
-                for col in valid_numerical_cols:
-                    valid_data[col] = pd.to_numeric(valid_data[col], errors='coerce')
-                valid_data = valid_data.dropna()
-                
-                if len(valid_data) > 1 and valid_data.shape[1] > 1:
-                    correlation_matrix = valid_data.corr()
-                    
-                    # Correlation heatmap
-                    fig = visualizer.create_correlation_heatmap(correlation_matrix)
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                    # Strong correlations
-                    st.subheader("Strong Correlations")
-                    # Create temporary analyzer for filtered data
-                    temp_analyzer = DataAnalyzer(valid_data)
-                    strong_corr = temp_analyzer.find_strong_correlations()
-                    if not strong_corr.empty:
-                        st.dataframe(strong_corr, use_container_width=True)
-                    else:
-                        st.info("No strong correlations found (threshold: 0.7)")
                 else:
-                    st.info("Insufficient valid data for correlation analysis.")
-            else:
-                st.info("Need at least 2 valid numerical columns for correlation analysis.")
-        
-        with tab6:
-            st.header("Export Analysis Report")
+                    st.info("No valid numerical data available for distribution plots.")
             
-            if st.button("📄 Generate Report"):
-                report = generate_analysis_report(data, analyzer, kpi_generator)
+            with viz_tab2:
+                st.subheader("Create Custom Metrics")
                 
-                # Create download button
-                st.download_button(
-                    label="📥 Download Report",
-                    data=report,
-                    file_name=f"data_analysis_report_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.txt",
-                    mime="text/plain"
-                )
+                # Custom metrics creation interface
+                col1, col2 = st.columns([1, 1])
                 
-                # Display report preview
-                st.subheader("Report Preview")
-                st.text_area("Report Content", report, height=400)
-    
-    else:
-        # Welcome screen
-        st.markdown("""
-        ## Welcome to Excel Data Insights & KPI Analyzer! 🎉
-        
-        This application helps you analyze your Excel data and provides:
-        
-        - 📊 **Comprehensive Data Overview**: Basic statistics, data types, and structure analysis
-        - 🔍 **Deep Data Insights**: Missing values, outliers, and data quality assessment
-        - 🎯 **Smart KPI Recommendations**: Automated suggestions based on your data structure
-        - 📈 **Interactive Visualizations**: Charts and graphs to understand your data better
-        - 🔗 **Correlation Analysis**: Discover relationships between variables
-        - 📄 **Exportable Reports**: Download comprehensive analysis reports
-        
-        ### How to Get Started:
-        1. Click "Browse files" in the sidebar
-        2. Upload your Excel file (.xlsx or .xls)
-        3. Select a sheet if your file has multiple sheets
-        4. Explore the analysis tabs above!
-        
-        ### Supported Features:
-        - ✅ Multiple Excel formats (.xlsx, .xls)
-        - ✅ Multi-sheet workbooks
-        - ✅ Large dataset handling
-        - ✅ Real-time analysis
-        - ✅ Interactive visualizations
-        """)
-
-def generate_analysis_report(data, analyzer, kpi_generator):
-    """Generate a comprehensive text report of the analysis."""
-    report = []
-    report.append("=" * 60)
-    report.append("EXCEL DATA ANALYSIS REPORT")
-    report.append("=" * 60)
-    report.append(f"Generated on: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    report.append("")
-    
-    # Basic Info
-    report.append("1. BASIC INFORMATION")
-    report.append("-" * 25)
-    basic_info = analyzer.get_basic_info()
-    for key, value in basic_info.items():
-        report.append(f"{key}: {value}")
-    report.append("")
-    
-    # Data Quality
-    report.append("2. DATA QUALITY METRICS")
-    report.append("-" * 30)
-    quality_metrics = analyzer.get_data_quality_metrics()
-    for metric, value in quality_metrics.items():
-        report.append(f"{metric}: {value}")
-    report.append("")
-    
-    # Missing Values
-    report.append("3. MISSING VALUES ANALYSIS")
-    report.append("-" * 35)
-    missing_data = analyzer.analyze_missing_values()
-    if not missing_data.empty:
-        for idx, row in missing_data.iterrows():
-            report.append(f"{idx}: {row['Missing_Count']} missing ({row['Missing_Percentage']:.2f}%)")
-    else:
-        report.append("No missing values found.")
-    report.append("")
-    
-    # KPI Recommendations
-    report.append("4. KPI RECOMMENDATIONS")
-    report.append("-" * 25)
-    kpi_suggestions = kpi_generator.generate_kpi_suggestions()
-    for category, kpis in kpi_suggestions.items():
-        report.append(f"\n{category.upper()}:")
-        for kpi in kpis:
-            report.append(f"  • {kpi['name']}: {kpi['description']}")
-    
-    return "\n".join(report)
-
-if __name__ == "__main__":
-    main()
+                with col1:
+                    st.markdown("**Chart Configuration**")
+                    
+                    # Chart type selection
+                    chart_type = st.selectbox(
+                        "Chart Type",
+                        ["Bar Chart", "Line Chart", "Scatter Plot", "Pie Chart", "Area Chart"],
+                        help="Choose the type of visualization"
+                    )
+                    
+                    # Metric name
+                    metric_name = st.text_input(
+                        "Metric Name",
+                        placeholder="e.g., Sales Performance",
+                        help="Give your custom metric a descriptive name"
+                    )
+                
+                with col2:
+                    st.markdown("**Data Selection**")
+                    
+                    # Get all available columns
+                    all_cols = data.columns.tolist()
+                    
+                    if chart_type in ["Bar Chart", "Line Chart", "Area Chart"]:
+                        x_column = st.selectbox("X-axis (Categories)", all_cols, help="Choose categorical data for X-axis")
+                        y_column = st.selectbox("Y-axis (Values)", valid_numerical_cols if valid_numerical_cols else all_cols, help="Choose numerical data for Y-axis")
+                        color_column = st.selectbox("Color Grouping (Optional)", ["None"] + all_cols, help="Optional: Group data by color")
+                        
+                    elif chart_type == "Scatter Plot":
+                        x_column = st.selectbox("X-axis", valid_numerical_cols if valid_numerical_cols else all_cols, help="Choose numerical data for X-axis")
+                        y_column = st.selectbox("Y-axis", valid_numerical_cols if valid_numerical_cols else all_cols, help="Choose numerical data for Y-axis")
+                        color_column = st.selectbox("Color Grouping (Optional)", ["None"] + all_cols, help="Optional: Group data by color")
+                        
+                    elif chart_type == "Pie Chart":
+                        x_column = st.selectbox("Categories", all_cols, help="Choose categorical data")
+                        y_column = st.selectbox("Values", valid_numerical_cols if valid_numerical_cols else all_cols, help="Choose numerical data for pie sizes")
+                        color_column = None
+                
+                # Advanced options
+                with st.expander("Advanced Options"):
+                    col3, col4 = st.columns(2)
+                    with col
